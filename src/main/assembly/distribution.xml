@@ -11,6 +11,14 @@
             <outputDirectory>/</outputDirectory>
         </file>
         <file>
+            <source>LICENSE</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source>README.md</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
             <source>src/main/wrappers/jvmtop.bat</source>
             <outputDirectory>/</outputDirectory>
         </file>

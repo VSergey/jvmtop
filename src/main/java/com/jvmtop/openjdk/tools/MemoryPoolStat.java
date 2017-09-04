@@ -34,32 +34,25 @@ import java.lang.management.MemoryUsage;
 public class MemoryPoolStat {
     private String      poolName;
     private long        usageThreshold;
-    private MemoryUsage usage;
     private long        lastGcId;
     private long        lastGcStartTime;
     private long        lastGcEndTime;
     private long        collectThreshold;
+    private MemoryUsage usage;
     private MemoryUsage beforeGcUsage;
     private MemoryUsage afterGcUsage;
 
-    MemoryPoolStat(String name,
-                   long usageThreshold,
-                   MemoryUsage usage,
-                   long lastGcId,
-                   long lastGcStartTime,
-                   long lastGcEndTime,
-                   long collectThreshold,
-                   MemoryUsage beforeGcUsage,
-                   MemoryUsage afterGcUsage) {
-        this.poolName = name;
-        this.usageThreshold = usageThreshold;
-        this.usage = usage;
-        this.lastGcId = lastGcId;
-        this.lastGcStartTime = lastGcStartTime;
-        this.lastGcEndTime = lastGcEndTime;
-        this.collectThreshold = collectThreshold;
-        this.beforeGcUsage = beforeGcUsage;
-        this.afterGcUsage = afterGcUsage;
+    MemoryPoolStat(String p_name, long p_usageThreshold, MemoryUsage p_usage, long p_lastGcId, long p_lastGcStartTime,
+                   long p_lastGcEndTime, long p_collectThreshold, MemoryUsage p_beforeGcUsage, MemoryUsage p_afterGcUsage) {
+        poolName = p_name;
+        usageThreshold = p_usageThreshold;
+        usage = p_usage;
+        lastGcId = p_lastGcId;
+        lastGcStartTime = p_lastGcStartTime;
+        lastGcEndTime = p_lastGcEndTime;
+        collectThreshold = p_collectThreshold;
+        beforeGcUsage = p_beforeGcUsage;
+        afterGcUsage = p_afterGcUsage;
     }
 
     /**

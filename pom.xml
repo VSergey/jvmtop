@@ -6,7 +6,7 @@
 
     <groupId>com.jvmtop</groupId>
     <artifactId>jvmtop</artifactId>
-    <version>0.9.0-SNAPSHOT</version>
+    <version>1.0</version>
 
     <dependencies>
         <dependency>
@@ -27,7 +27,7 @@
     <properties>
         <!-- change it to point to your tools.jar from your JDK -->
         <toolsjar>${java.home}/../lib/tools.jar</toolsjar>
-        <jdk.version>1.6</jdk.version>
+        <jdk.version>1.8</jdk.version>
     </properties>
 
     <build>
@@ -63,8 +63,7 @@
                         <configuration>
                             <appendAssemblyId>false</appendAssemblyId>
                             <descriptors>
-                                <descriptor>src/main/assembly/distribution.xml
-                                </descriptor>
+                                <descriptor>src/main/assembly/distribution.xml</descriptor>
                             </descriptors>
                         </configuration>
                     </execution>

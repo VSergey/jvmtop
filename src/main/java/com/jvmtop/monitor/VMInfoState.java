@@ -1,4 +1,4 @@
-/**
+/*
  * jvmtop - java monitoring for the command-line
  *
  * Copyright (C) 2013 by Patric Rufflar. All rights reserved.
@@ -22,12 +22,13 @@ package com.jvmtop.monitor;
 
 /**
  * Indicates the monitoring state of a remote jvm.
- *
- * @author paru
- *
  */
 public enum VMInfoState {
-  INIT, ERROR_DURING_ATTACH, ATTACHED, ATTACHED_UPDATE_ERROR, DETACHED,
-  CONNECTION_REFUSED,
-  UNKNOWN_ERROR
+    INIT,
+    ERROR_DURING_ATTACH,
+    ATTACHED,
+    ATTACHED_UPDATE_ERROR,
+    DETACHED,
+    CONNECTION_REFUSED,
+    UNKNOWN_ERROR
 }

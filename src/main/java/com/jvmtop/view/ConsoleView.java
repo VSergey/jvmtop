@@ -1,4 +1,4 @@
-/**
+/*
  * jvmtop - java monitoring for the command-line
  *
  * Copyright (C) 2013 by Patric Rufflar. All rights reserved.
@@ -21,35 +21,36 @@
 package com.jvmtop.view;
 
 /**
- *
  * Defines a console view.
- *
- * @author paru
- *
  */
 public interface ConsoleView
 {
-  /**
-   * Prints the view to STDOUT.
-   *
-   * @throws Exception
-   */
-  public void printView() throws Exception;
+    /**
+     * Prints the view to STDOUT.
+     */
+    void printView() throws Exception;
 
-  /**
-   * Notifies that this view encountered issues
-   * and should be called again (e.g. due to exceptions)
-   *
-   * TODO: remove this method and use proper exception instead.
-   *
-   * @return
-   */
-  public boolean shouldExit();
+    /**
+     * Finalizer for view - end files, flush buffers
+     */
+    void last() throws Exception;
 
-  /**
-   * Requests the view to sleep (defined as "not outputting anything").
-   * However, the view is allowed to do some work / telemtry retrieval during sleep.
-   *
-   */
-  public void sleep(long millis) throws Exception;
+    /**
+     * Notifies that this view encountered issues
+     * and should be called again (e.g. due to exceptions)
+     *
+     * TODO: remove this method and use proper exception instead.
+     */
+    boolean shouldExit();
+
+    /**
+     * Requests the view to sleep (defined as "not outputting anything").
+     * However, the view is allowed to do some work / telemtry retrieval during sleep.
+     */
+    void sleep(long millis) throws Exception;
+
+    boolean isTopBarRequired();
+
+    boolean isClearingRequired();
+
 }

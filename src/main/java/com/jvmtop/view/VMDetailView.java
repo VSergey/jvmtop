@@ -1,4 +1,4 @@
-/**
+/*
  * jvmtop - java monitoring for the command-line
  *
  * Copyright (C) 2013 by Patric Rufflar. All rights reserved.
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import com.jvmtop.Config;
 import com.jvmtop.monitor.VMInfo;
 import com.jvmtop.monitor.VMInfoState;
 import com.jvmtop.openjdk.tools.LocalVirtualMachine;
@@ -35,256 +36,145 @@ import com.jvmtop.openjdk.tools.LocalVirtualMachine;
 /**
  * "detail" view, printing detail metrics of a specific jvm.
  * Also printing the top threads (based on the current CPU usage)
- *
- * @author paru
- *
  */
 public class VMDetailView extends AbstractConsoleView
 {
+    private VMInfo vmInfo;
 
-  private VMInfo          vmInfo_;
+    //TODO: refactor
+    private Map<Long, Long> previousThreadCPUMillis   = new HashMap<>();
 
-  private boolean         sortByTotalCPU_           = false;
-
-  private int             numberOfDisplayedThreads_ = 10;
-
-  private int             threadNameDisplayWidth_   = 30;
-
-  private boolean         displayedThreadLimit_     = true;
-
-  //TODO: refactor
-  private Map<Long, Long> previousThreadCPUMillis   = new HashMap<Long, Long>();
-
-  public VMDetailView(int vmid, Integer width) throws Exception
-  {
-    super(width);
-    LocalVirtualMachine localVirtualMachine = LocalVirtualMachine
-        .getLocalVirtualMachine(vmid);
-    vmInfo_ = VMInfo.processNewVM(localVirtualMachine, vmid);
-  }
-
-  public boolean isSortByTotalCPU()
-  {
-    return sortByTotalCPU_;
-  }
-
-  public void setSortByTotalCPU(boolean sortByTotalCPU)
-  {
-    sortByTotalCPU_ = sortByTotalCPU;
-  }
-
-  @Override
-  public void printView() throws Exception
-  {
-    vmInfo_.update();
-
-    if (vmInfo_.getState() == VMInfoState.ATTACHED_UPDATE_ERROR)
-    {
-      System.out
-          .println("ERROR: Could not fetch telemetries - Process terminated?");
-      exit();
-      return;
-    }
-    if (vmInfo_.getState() != VMInfoState.ATTACHED)
-    {
-      System.out.println("ERROR: Could not attach to process.");
-      exit();
-      return;
+    public VMDetailView(Config p_config) throws Exception {
+        super(p_config);
+        LocalVirtualMachine localVirtualMachine = LocalVirtualMachine.getLocalVirtualMachine(p_config.getPid());
+        vmInfo = VMInfo.processNewVM(localVirtualMachine, p_config.getPid());
     }
 
-    Map<String, String> properties = vmInfo_.getSystemProperties();
+    public void printView() throws Exception {
+        vmInfo.update();
 
-    String command = properties.get("sun.java.command");
-    if (command != null)
-    {
-      String[] commandArray = command.split(" ");
-
-      List<String> commandList = Arrays.asList(commandArray);
-      commandList = commandList.subList(1, commandList.size());
-
-      System.out.printf(" PID %d: %s %n", vmInfo_.getId(), commandArray[0]);
-
-      String argJoin = join(commandList, " ");
-      if (argJoin.length() > 67)
-      {
-        System.out.printf(" ARGS: %s[...]%n", leftStr(argJoin, 67));
-      }
-      else
-      {
-        System.out.printf(" ARGS: %s%n", argJoin);
-      }
-    }
-    else
-    {
-      System.out.printf(" PID %d: %n", vmInfo_.getId());
-      System.out.printf(" ARGS: [UNKNOWN] %n");
-    }
-
-    String join = join(vmInfo_.getRuntimeMXBean().getInputArguments(), " ");
-    if (join.length() > 65)
-    {
-      System.out.printf(" VMARGS: %s[...]%n", leftStr(join, 65));
-    }
-    else
-    {
-      System.out.printf(" VMARGS: %s%n", join);
-    }
-
-    System.out.printf(" VM: %s %s %s%n", properties.get("java.vendor"),
-        properties.get("java.vm.name"), properties.get("java.version"));
-    System.out.printf(
-        " UP: %-7s #THR: %-4d #THRPEAK: %-4d #THRCREATED: %-4d USER: %-12s%n",
-        toHHMM(vmInfo_.getRuntimeMXBean().getUptime()), vmInfo_
-            .getThreadCount(), vmInfo_.getThreadMXBean().getPeakThreadCount(),
-        vmInfo_.getThreadMXBean().getTotalStartedThreadCount(), vmInfo_
-            .getOSUser());
-
-    System.out.printf(
-        " GC-Time: %-7s  #GC-Runs: %-8d  #TotalLoadedClasses: %-8d%n",
-        toHHMM(vmInfo_.getGcTime()), vmInfo_.getGcCount(),
-        vmInfo_.getTotalLoadedClassCount());
-
-    System.out.printf(
-        " CPU: %5.2f%% GC: %5.2f%% HEAP:%5s /%5s NONHEAP:%5s /%5s%n",
-        vmInfo_.getCpuLoad() * 100, vmInfo_.getGcLoad() * 100,
-        toMB(vmInfo_.getHeapUsed()), toMB(vmInfo_.getHeapMax()),
-        toMB(vmInfo_.getNonHeapUsed()), toMB(vmInfo_.getNonHeapMax()));
-
-    System.out.println();
-
-    printTopThreads();
-
-  }
-
-  /**
-   * @throws Exception
-   */
-  private void printTopThreads() throws Exception
-  {
-    System.out.printf(" %6s %-" + threadNameDisplayWidth_
-        + "s  %13s %8s    %8s %5s %n", "TID", "NAME", "STATE", "CPU",
-        "TOTALCPU", "BLOCKEDBY");
-
-    if (vmInfo_.getThreadMXBean().isThreadCpuTimeSupported())
-    {
-
-      //TODO: move this into VMInfo?
-      Map<Long, Long> newThreadCPUMillis = new HashMap<Long, Long>();
-
-      Map<Long, Long> cpuTimeMap = new TreeMap<Long, Long>();
-
-      for (Long tid : vmInfo_.getThreadMXBean().getAllThreadIds())
-      {
-        long threadCpuTime = vmInfo_.getThreadMXBean().getThreadCpuTime(tid);
-        long deltaThreadCpuTime = 0;
-        if (previousThreadCPUMillis.containsKey(tid))
-        {
-          deltaThreadCpuTime = threadCpuTime - previousThreadCPUMillis.get(tid);
-
-          cpuTimeMap.put(tid, deltaThreadCpuTime);
+        if (vmInfo.getState() == VMInfoState.ATTACHED_UPDATE_ERROR) {
+            System.out.println("ERROR: Could not fetch telemetries - Process terminated?");
+            exit();
+            return;
         }
-        newThreadCPUMillis.put(tid, threadCpuTime);
-      }
-
-      cpuTimeMap = sortByValue(cpuTimeMap, true);
-
-      int displayedThreads = 0;
-      for (Long tid : cpuTimeMap.keySet())
-      {
-        ThreadInfo info = vmInfo_.getThreadMXBean().getThreadInfo(tid);
-        displayedThreads++;
-        if (displayedThreads > numberOfDisplayedThreads_
-            && displayedThreadLimit_)
-        {
-          break;
+        if (vmInfo.getState() != VMInfoState.ATTACHED) {
+            System.out.println("ERROR: Could not attach to process.");
+            exit();
+            return;
         }
-        if (info != null)
-        {
-          System.out.printf(
-              " %6d %-" + threadNameDisplayWidth_
-                  + "s  %13s %5.2f%%    %5.2f%% %5s %n",
-              tid,
-              leftStr(info.getThreadName(), threadNameDisplayWidth_),
-              info.getThreadState(),
-              getThreadCPUUtilization(cpuTimeMap.get(tid),
-                  vmInfo_.getDeltaUptime()),
-              getThreadCPUUtilization(vmInfo_.getThreadMXBean()
-                  .getThreadCpuTime(tid), vmInfo_.getProxyClient()
-                  .getProcessCpuTime(), 1), getBlockedThread(info));
+
+        Map<String, String> properties = vmInfo.getSystemProperties();
+
+        String command = properties.get("sun.java.command");
+        if (command != null) {
+            String[] commandArray = command.split(" ");
+
+            List<String> commandList = Arrays.asList(commandArray);
+            commandList = commandList.subList(1, commandList.size());
+
+            System.out.printf(" PID %d: %s %n", vmInfo.getId(), commandArray[0]);
+
+            String argJoin = join(commandList, " ");
+            if (argJoin.length() > 67) {
+                System.out.printf(" ARGS: %s[...]%n", leftStr(argJoin, 67));
+            } else {
+                System.out.printf(" ARGS: %s%n", argJoin);
+            }
+        } else {
+            System.out.printf(" PID %d: %n", vmInfo.getId());
+            System.out.printf(" ARGS: [UNKNOWN] %n");
         }
-      }
-      if (newThreadCPUMillis.size() >= numberOfDisplayedThreads_
-          && displayedThreadLimit_)
-      {
 
-        System.out.printf(
-            " Note: Only top %d threads (according cpu load) are shown!",
-            numberOfDisplayedThreads_);
-      }
-      previousThreadCPUMillis = newThreadCPUMillis;
+        String join = "\n " + join(vmInfo.getRuntimeMXBean().getInputArguments(), "\n ");
+//        if (join.length() > 65) {
+//            System.out.printf(" VMARGS: %s[...]%n", leftStr(join, 65));
+//        } else {
+            System.out.printf(" VMARGS: %s%n", join);
+//        }
+
+        System.out.printf(" VM: %s %s %s%n", properties.get("java.vendor"),
+                properties.get("java.vm.name"), properties.get("java.version"));
+        System.out.printf(" UP: %-7s #THR: %-4d #THRPEAK: %-4d #THRCREATED: %-4d USER: %-12s%n",
+                toHHMM(vmInfo.getRuntimeMXBean().getUptime()), vmInfo.getThreadCount(),
+                vmInfo.getThreadMXBean().getPeakThreadCount(),
+                vmInfo.getThreadMXBean().getTotalStartedThreadCount(), vmInfo.getOSUser());
+
+        System.out.printf(" GC-Time: %-7s  #GC-Runs: %-8d  #TotalLoadedClasses: %-8d%n",
+                toHHMM(vmInfo.getGcTime()), vmInfo.getGcCount(), vmInfo.getTotalLoadedClassCount());
+
+        System.out.printf(" CPU: %5.2f%% GC: %5.2f%% HEAP:%5s /%5s NONHEAP:%5s /%5s%n",
+                vmInfo.getCpuLoad() * 100, vmInfo.getGcLoad() * 100,
+                toMB(vmInfo.getHeapUsed()), toMB(vmInfo.getHeapMax()),
+                toMB(vmInfo.getNonHeapUsed()), toMB(vmInfo.getNonHeapMax()));
+
+        System.out.println();
+        printTopThreads();
     }
-    else
-    {
 
-      System.out
-          .printf("%n -Thread CPU telemetries are not available on the monitored jvm/platform-%n");
+    private void printTopThreads() throws Exception {
+        System.out.printf(" %6s %-" + config.getThreadNameDisplayWidth()
+                + "s  %13s %8s    %8s %5s %n", "TID", "NAME", "STATE", "CPU", "TOTALCPU", "BLOCKEDBY");
+//                + "s  %-13s %-8s    %8s %-5s %n", "TID", "NAME", "STATE", "CPU", "TOTALCPU", "BLOCKEDBY");
+
+        if (vmInfo.getThreadMXBean().isThreadCpuTimeSupported()) {
+            //TODO: move this into VMInfo?
+            Map<Long, Long> newThreadCPUMillis = new HashMap<>();
+            Map<Long, Long> cpuTimeMap = new TreeMap<>();
+            for (Long tid : vmInfo.getThreadMXBean().getAllThreadIds()) {
+                long threadCpuTime = vmInfo.getThreadMXBean().getThreadCpuTime(tid);
+                if (previousThreadCPUMillis.containsKey(tid)) {
+                    long deltaThreadCpuTime = threadCpuTime - previousThreadCPUMillis.get(tid);
+                    cpuTimeMap.put(tid, deltaThreadCpuTime);
+                }
+                newThreadCPUMillis.put(tid, threadCpuTime);
+            }
+            cpuTimeMap = sortByValue(cpuTimeMap, true);
+
+            int displayedThreads = 0;
+            for (Long tid : cpuTimeMap.keySet()) {
+                ThreadInfo info = vmInfo.getThreadMXBean().getThreadInfo(tid);
+                displayedThreads++;
+                if (config.isDisplayedThreadLimit() && displayedThreads > config.getNumberOfDisplayedThreads()) {
+                    break;
+                }
+                if (info != null) {
+                    System.out.printf(" %6d %-" + config.getThreadNameDisplayWidth() + "s  %13s %5.2f%%    %5.2f%% %5s %n",
+//                    System.out.printf(" %6d %-" + threadNameDisplayWidth + "s  %-13s %5.2f%%    %5.2f%% %5s %n",
+                            tid,
+                            leftStr(info.getThreadName(), config.getThreadNameDisplayWidth()),
+                            info.getThreadState(),
+                            getThreadCPUUtilization(cpuTimeMap.get(tid), vmInfo.getDeltaUptime()),
+                            getThreadCPUUtilization(
+                                    vmInfo.getThreadMXBean().getThreadCpuTime(tid),
+                                    vmInfo.getProxyClient().getProcessCpuTime(), 1),
+                            getBlockedThread(info));
+                }
+            }
+            if (config.isDisplayedThreadLimit() && newThreadCPUMillis.size() >= config.getNumberOfDisplayedThreads()) {
+                System.out.printf(" Note: Only top %d threads (according cpu load) are shown!", config.getNumberOfDisplayedThreads());
+            }
+            previousThreadCPUMillis = newThreadCPUMillis;
+        } else {
+            System.out.printf("%n -Thread CPU telemetries are not available on the monitored jvm/platform-%n");
+        }
     }
-  }
 
-  private String getBlockedThread(ThreadInfo info)
-  {
-    if (info.getLockOwnerId() >= 0)
-    {
-      return "" + info.getLockOwnerId();
+    private String getBlockedThread(ThreadInfo info) {
+        if (info.getLockOwnerId() >= 0) {
+            return "" + info.getLockOwnerId();
+        }
+        return "";
     }
-    else
-    {
-      return "";
+
+    private double getThreadCPUUtilization(long deltaThreadCpuTime, long totalTime) {
+        return getThreadCPUUtilization(deltaThreadCpuTime, totalTime, 1000 * 1000);
     }
-  }
 
-  public int getNumberOfDisplayedThreads()
-  {
-    return numberOfDisplayedThreads_;
-  }
-
-  public void setNumberOfDisplayedThreads(int numberOfDisplayedThreads)
-  {
-    numberOfDisplayedThreads_ = numberOfDisplayedThreads;
-  }
-
-  public boolean isDisplayedThreadLimit()
-  {
-    return displayedThreadLimit_;
-  }
-
-  public void setDisplayedThreadLimit(boolean displayedThreadLimit)
-  {
-    displayedThreadLimit_ = displayedThreadLimit;
-  }
-
-  public int getThreadNameDisplayWidth()
-  {
-    return threadNameDisplayWidth_;
-  }
-
-  public void setThreadNameDisplayWidth(int threadNameDisplayWidth_)
-  {
-    this.threadNameDisplayWidth_ = threadNameDisplayWidth_;
-  }
-
-  private double getThreadCPUUtilization(long deltaThreadCpuTime, long totalTime)
-  {
-    return getThreadCPUUtilization(deltaThreadCpuTime, totalTime, 1000 * 1000);
-  }
-
-  private double getThreadCPUUtilization(long deltaThreadCpuTime,
-      long totalTime, double factor)
-  {
-    if (totalTime == 0)
-    {
-      return 0;
+    private double getThreadCPUUtilization(long deltaThreadCpuTime, long totalTime, double factor) {
+        if (totalTime == 0) {
+            return 0;
+        }
+        return deltaThreadCpuTime / factor / totalTime * 100d;
     }
-    return deltaThreadCpuTime / factor / totalTime * 100d;
-  }
 }
